@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Email Verification — Rajesh Basnet</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f4f4f5; font-family: 'Inter', sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+    }
+    .card {
+      background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 2.5rem 2rem; width: 100%; max-width: 380px; text-align: center;
+    }
+    .icon { font-size: 3rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.3rem; font-weight: 600; color: #18181b; margin-bottom: 0.5rem; }
+    p { font-size: 0.88rem; color: #71717a; line-height: 1.6; margin-bottom: 1.5rem; }
+    .btn {
+      display: inline-block; padding: 0.75rem 2rem; background: #18181b; color: #fff;
+      border: none; border-radius: 8px; font-family: 'Inter', sans-serif;
+      font-size: 0.9rem; font-weight: 500; cursor: pointer; text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #27272a; }
+    .loading { color: #71717a; font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="icon">⏳</div>
+    <h1>Verifying your email...</h1>
+    <p class="loading">Please wait a moment.</p>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth, applyActionCode, verifyPasswordResetCode, confirmPasswordReset
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDtEF2vPuy_ItSZy8Fmynh-Kr6wFZbjbCg",
+      authDomain: "rajesh-lab-8b6ef.firebaseapp.com",
+      projectId: "rajesh-lab-8b6ef",
+      storageBucket: "rajesh-lab-8b6ef.firebasestorage.app",
+      messagingSenderId: "460748884560",
+      appId: "1:460748884560:web:73b9981e2a94c1c1809f55"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // Get parameters from URL
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+
+    const card = document.getElementById('card');
+
+    function showSuccess(title, msg, btnText, btnLink) {
+      card.innerHTML = `
+        <div class="icon">✅</div>
+        <h1>${title}</h1>
+        <p>${msg}</p>
+        <a href="${btnLink}" class="btn">${btnText}</a>
+      `;
+    }
+
+    function showError(title, msg) {
+      card.innerHTML = `
+        <div class="icon">❌</div>
+        <h1>${title}</h1>
+        <p>${msg}</p>
+        <a href="/lab.html" class="btn">Back to Login</a>
+      `;
+    }
+
+    if (!mode || !oobCode) {
+      showError('Invalid Link', 'This link is invalid or has already been used.');
+    } else if (mode === 'verifyEmail') {
+      // Handle email verification
+      applyActionCode(auth, oobCode)
+        .then(() => {
+          showSuccess(
+            'Email Verified! 🎉',
+            'Your email has been successfully verified. You can now sign in to your account.',
+            'Go to Login',
+            '/lab.html'
+          );
+        })
+        .catch(() => {
+          showError(
+            'Link Expired',
+            'This verification link has expired or already been used. Please register again to get a new link.'
+          );
+        });
+
+    } else if (mode === 'resetPassword') {
+      // Handle password reset
+      verifyPasswordResetCode(auth, oobCode)
+        .then(() => {
+          card.innerHTML = `
+            <div class="icon">🔑</div>
+            <h1>Reset Your Password</h1>
+            <p>Enter your new password below.</p>
+            <input type="password" id="newPass" placeholder="New password" style="
+              width:100%; padding:0.65rem 0.85rem; border:1.5px solid #e4e4e7;
+              border-radius:8px; font-family:Inter,sans-serif; font-size:0.9rem;
+              outline:none; margin-bottom:0.75rem;
+            "/>
+            <input type="password" id="confirmPass" placeholder="Confirm password" style="
+              width:100%; padding:0.65rem 0.85rem; border:1.5px solid #e4e4e7;
+              border-radius:8px; font-family:Inter,sans-serif; font-size:0.9rem;
+              outline:none; margin-bottom:1rem;
+            "/>
+            <div id="resetMsg" style="font-size:0.8rem;color:#b91c1c;margin-bottom:0.75rem;display:none;"></div>
+            <button class="btn" style="width:100%;" onclick="doReset()">Reset Password</button>
+          `;
+
+          window.doReset = async () => {
+            const newPass = document.getElementById('newPass').value;
+            const confirmPass = document.getElementById('confirmPass').value;
+            const msg = document.getElementById('resetMsg');
+            if (newPass.length < 6) { msg.textContent = 'Password must be at least 6 characters.'; msg.style.display = 'block'; return; }
+            if (newPass !== confirmPass) { msg.textContent = 'Passwords do not match.'; msg.style.display = 'block'; return; }
+            try {
+              await confirmPasswordReset(auth, oobCode, newPass);
+              showSuccess('Password Reset!', 'Your password has been updated. You can now sign in with your new password.', 'Go to Login', '/lab.html');
+            } catch (e) {
+              showError('Reset Failed', 'This reset link has expired. Please request a new one.');
+            }
+          };
+        })
+        .catch(() => {
+          showError('Link Expired', 'This password reset link has expired. Please request a new one from the login page.');
+        });
+    }
+  </script>
+</body>
+</html>
